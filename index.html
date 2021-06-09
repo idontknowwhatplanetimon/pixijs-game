@@ -1,0 +1,153 @@
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>Parallax Scrolling Demo</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/5.1.3/pixi.min.js"></script>
+    <script src="js/Far.js"></script>
+    <script src="js/Mid.js"></script>
+    <script src="js/Player.js"></script>
+    <script src="js/Scroller.js"></script>
+    <script src="js/WallSpritesPool.js"></script>
+    <script src="js/SliceType.js"></script>
+    <script src="js/WallSlice.js"></script>
+    <script src="js/Walls.js"></script>
+    <script src="js/MapBuilder.js"></script>
+    <style>
+      * { padding: 0; margin: 0; }
+			body {
+				height: 100vh;
+				display: flex;
+				justify-content: center;
+				align-items: center;
+				background-color: #000; 
+			}
+    </style>
+  </head>
+  <body>
+    <script>
+      let type = "WebGL"
+      if (!PIXI.utils.isWebGLSupported()) {
+        type = "canvas"
+      }
+      
+      PIXI.utils.sayHello(type);
+   
+      const MIN_SCROLL_SPEED = 5;
+      const MAX_SCROLL_SPEED = 10;
+      const SCROLL_ACCELERATION = 0.1;
+
+			const width = 512, height = 384;
+
+      let app = new PIXI.Application({ width: width, height: height });
+      document.body.appendChild(app.view);
+      
+      PIXI.loader
+        .add([
+          "bg-far.png",
+          "bg-mid.png",
+          "wall.json",
+          "run.json"
+        ])
+        .load(setup);
+
+      let gameScene, gameOverScene, scroller, player;
+      let scrollSpeed = MIN_SCROLL_SPEED;
+
+      function setup() {
+				gameOverScene = new PIXI.Container();
+
+				gameScene = new PIXI.Container();
+				app.stage.addChild(gameScene);
+							
+        scroller = new Scroller(gameScene);
+
+        player = new Player(PIXI.loader.resources["run.json"].spritesheet.animations["run"]);
+        app.stage.addChild(player);
+        let up = keyboard('ArrowUp');
+        up.press = () => {
+          player.jump();
+        };
+
+        requestAnimationFrame(update);
+      }
+
+      function update() {
+				const hasWon = scroller.front.viewportSliceX > scroller.front.slices.length - Walls.VIEWPORT_NUM_SLICES - 1; 
+				const hasLost = player.isLost;
+
+      	if (hasWon || hasLost) {
+					end();	
+					return;
+				}
+
+				scroller.moveViewportXBy(scrollSpeed);
+        scrollSpeed += SCROLL_ACCELERATION;
+        player.move(scroller.front.getWallOnPlayerYPos());
+
+        if (scrollSpeed > MAX_SCROLL_SPEED) {
+        	scrollSpeed = MAX_SCROLL_SPEED;
+        }
+
+        requestAnimationFrame(update); 
+      }
+
+			function end() {
+				app.stage.removeChild(gameScene);
+				app.stage.removeChild(player);
+
+				const message = new PIXI.Text('Game is over.', { fill: 'white' }); 
+				message.x = width / 2 - message.width / 2;
+				message.y = height / 2 - message.height / 2;
+
+				gameOverScene.addChild(message);
+
+				app.stage.addChild(gameOverScene);
+			}
+
+      function keyboard(value) {
+        let key = {};
+        key.value = value;
+        key.isDown = false;
+        key.isUp = true;
+        key.press = undefined;
+        key.release = undefined;
+
+        key.downHandler = event => {
+          if (event.key === key.value) {
+            if (key.isUp && key.press) key.press();
+            key.isDown = true;
+            key.isUp = false;
+            event.preventDefault();
+          }
+        };
+
+        key.upHandler = event => {
+          if (event.key === key.value) {
+            if(key.isDown && key.release) key.release();
+            key.isDown = false;
+            key.isUp = true;
+            event.preventDefault();
+          }
+        } 
+
+        const downListener = key.downHandler.bind(key);
+        const upListener = key.upHandler.bind(key);
+
+        window.addEventListener(
+          "keydown", downListener, false
+        );
+
+        window.addEventListener(
+          "keyup", upListener, false
+        );
+
+        key.unsubscribe = () => {
+          window.removeEventListener("keydown", downListener);
+          window.removeEventListener("keyup", upListener);
+        };
+
+        return key;
+      }
+    </script>
+  </body>
+</html>
